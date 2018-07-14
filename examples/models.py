@@ -4,12 +4,11 @@ from layers import LinearARD
 from torch import nn
 import torch
 
-class DenseModel(nn.Module):
-    def __init__(self, input_shape, output_shape, hidden_size=150, device=None, activation=None):
-        super(DenseModel, self).__init__()
+class DenseModelARD(nn.Module):
+    def __init__(self, input_shape, output_shape, hidden_size=150, activation=None):
+        super(DenseModelARD, self).__init__()
         self.l1 = LinearARD(input_shape, hidden_size)
         self.l2 = LinearARD(hidden_size, output_shape)
-        self.device = device
         self.activation = activation
 
     def forward(self, input):
@@ -21,7 +20,6 @@ class DenseModel(nn.Module):
 
     def _forward(self, input, clip=False, deterministic=False):
         x = input
-        if self.device: x = x.to(device)
         x = self.l1._forward(x, clip=clip, deterministic=deterministic)
         x = nn.functional.tanh(x)
         x = self.l2._forward(x, clip=clip, deterministic=deterministic)
@@ -36,3 +34,22 @@ class DenseModel(nn.Module):
         l2_params_cnt_dropped, l2_params_cnt_all = self.l2.get_ard()
         return (l1_params_cnt_dropped + l2_params_cnt_dropped) / \
             (l1_params_cnt_all + l2_params_cnt_all)
+
+class DenseModel(nn.Module):
+    def __init__(self, input_shape, output_shape, hidden_size=150, activation=None):
+        super(DenseModel, self).__init__()
+        self.l1 = nn.Linear(input_shape, hidden_size)
+        self.l2 = nn.Linear(hidden_size, output_shape)
+        self.activation = activation
+
+    def forward(self, input):
+        x = input
+        x = self.l1(x)
+        x = nn.functional.tanh(x)
+        x = self.l2(x)
+        if self.activation: x = self.activation(x)
+        return x
+
+    def predict(self, input):
+        with torch.no_grad():
+            return self.forward(input)
