@@ -14,24 +14,24 @@ class DenseModelARD(nn.Module):
     def forward(self, input):
         return self._forward(input)
 
-    def predict(self, input, clip=False, deterministic=False):
+    def predict(self, input, clip=False, deterministic=False, thresh=3):
         with torch.no_grad():
-            return self._forward(input, clip, deterministic)
+            return self._forward(input, clip, deterministic, thresh=thresh)
 
-    def _forward(self, input, clip=False, deterministic=False):
+    def _forward(self, input, clip=False, deterministic=False, thresh=3):
         x = input
-        x = self.l1._forward(x, clip=clip, deterministic=deterministic)
+        x = self.l1._forward(x, clip=clip, deterministic=deterministic, thresh=thresh)
         x = nn.functional.tanh(x)
-        x = self.l2._forward(x, clip=clip, deterministic=deterministic)
+        x = self.l2._forward(x, clip=clip, deterministic=deterministic, thresh=thresh)
         if self.activation: x = self.activation(x)
         return x
 
     def eval_reg(self):
         return self.l1.eval_reg() + self.l2.eval_reg()
 
-    def eval_compression(self):
-        l1_params_cnt_dropped, l1_params_cnt_all = self.l1.get_ard()
-        l2_params_cnt_dropped, l2_params_cnt_all = self.l2.get_ard()
+    def eval_compression(self, thresh=3):
+        l1_params_cnt_dropped, l1_params_cnt_all = self.l1.get_ard(thresh=thresh)
+        l2_params_cnt_dropped, l2_params_cnt_all = self.l2.get_ard(thresh=thresh)
         return (l1_params_cnt_dropped + l2_params_cnt_dropped) / \
             (l1_params_cnt_all + l2_params_cnt_all)
 
