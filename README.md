@@ -33,6 +33,7 @@ All layers implemented in [layers.py](layers.py) script. It contains to PyTorch 
 ## TODO
 - [X] LinearARD layer implementation
 - [X] Conv2dARD layer implementation
+- [ ] Learnable bias for Conv2dARD
 
 ## Authors
 
