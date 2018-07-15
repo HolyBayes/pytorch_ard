@@ -102,3 +102,13 @@ class LeNetARD(nn.Module):
 
     def eval_compression(self, thresh=3):
         return sum([l.get_ard()[0] for l in [self.conv1, self.conv2, self.l1, self.l2]]) * 1.0 / sum([l.get_ard()[1] for l in [self.conv1, self.conv2, self.l1, self.l2]])
+
+class LeNet_MNIST(LeNet):
+    def __init__(self, input_shape, output_shape):
+        super(LeNet_MNIST, self).__init__(input_shape, output_shape)
+        self.l1 = nn.Linear(50*4*4, 500)
+
+class LeNetARD_MNIST(LeNetARD):
+    def __init__(self, input_shape, output_shape):
+        super(LeNetARD_MNIST, self).__init__(input_shape, output_shape)
+        self.l1 = LinearARD(50*4*4, 500)

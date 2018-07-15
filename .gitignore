@@ -1,4 +1,4 @@
 *.pyc
-experiments/cifar/data/*
-experiments/cifar/checkpoint/*
+experiments/*/data/*
+experiments/*/checkpoint/*
 __pycache__
