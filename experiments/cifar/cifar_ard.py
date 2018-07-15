@@ -20,7 +20,7 @@ ckpt_file = 'checkpoint/ckpt_ard.t7'
 
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
-reg_factor = 0
+reg_factor = 1e-4
 
 # Data
 print('==> Preparing data..')
@@ -74,7 +74,8 @@ def train(epoch):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, targets) #+ trainloader.batch_size * reg_factor * model.eval_reg() / len(trainset)
+        loss = criterion(outputs, targets) + \
+            trainloader.batch_size * reg_factor * model.eval_reg() / len(trainset)
         loss.backward()
         optimizer.step()
 

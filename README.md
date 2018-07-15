@@ -13,6 +13,8 @@ and the Local Reparameterization Trick discovered in the paper helps to eliminat
 
 ## Experiments
 
+All experiments are placed at [experiments](experiments/) folder and contains baseline and implemented models comparison.
+
 ### Boston dataset
 
 Two scripts were used in the experiment: [boston_baseline.py](experiments/boston/boston_baseline.py) and [boston_ard.py](experiments/boston/boston_ard.py). Training procedure for each experiment was **100000 epoches, Adam(lr=1e-3)**. Baseline model was dense neural network with single hidden layer with hidden size 150.
