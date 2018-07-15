@@ -31,6 +31,9 @@ You can see on the table above that variating regularization factor any degree o
 
 All layers implemented in [layers.py](layers.py) script. It contains to PyTorch layers implementations: **LinearARD** and **Conv2dARD**. It can be used as any other module and layer from "torch.nn.\*", but if there is still some misunderstanding about its usage see [experiments/models.py](experiments/models.py).
 
+## Tips
+
+Despite of high performance of implemented layers in "end-to-end" mode, authors recommends to use in fine-tuning pretrained models without ARD prior. In this case the best performance could be achieved. Moreover, it will be faster - despite of comparable convergence speed of this layers optimization, each training epoch takes more time (approx. twice longer - ~2 times more parameters in \*ARD implementations).  This fact well describable - using ARD prior in earlier stages can drop useful connections with unobvious dependencies.
 
 ## TODO
 - [X] LinearARD layer implementation
