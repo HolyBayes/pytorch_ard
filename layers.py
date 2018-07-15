@@ -66,7 +66,7 @@ class LinearARD(nn.Module):
         W = self.weight
         zeros = torch.zeros_like(W)
         if deterministic:
-            activation = input.matmul(torch.where(clip_mask, zeros, self.weigth).t())
+            activation = input.matmul(torch.where(clip_mask, zeros, self.weight).t())
         else:
             if clip:
                 W = torch.where(clip_mask, zeros, self.weight)
@@ -95,7 +95,7 @@ class LinearARD(nn.Module):
         """
         Get number of dropped weights (greater than "thresh" parameter)
 
-        :returns (number of dropped weights, number of all weigths)
+        :returns (number of dropped weights, number of all weight)
         """
         log_alpha = self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
         params_cnt_dropped = int((log_alpha > thresh).sum().cpu().numpy())
@@ -106,11 +106,13 @@ class LinearARD(nn.Module):
         log_alpha = self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
         return log_alpha.min(), log_alpha.max()
 
-class Conv2DARD(nn.Conv2d):
+class Conv2dARD(nn.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, bias=True, ard_init=-10):
-        super(Conv2DARD, self).__init__(in_channels, out_channels, kernel_size, stride,
+                 padding=0, dilation=1, groups=1, ard_init=-10):
+        bias = None # Learnable bias is not implemented yet
+        super(Conv2dARD, self).__init__(in_channels, out_channels, kernel_size, stride,
                      padding, dilation, groups, bias)
+        self.ard_init = ard_init
         self.log_sigma2 = Parameter(ard_init*torch.ones_like(self.weight))
 
     @staticmethod
@@ -147,12 +149,12 @@ class Conv2DARD(nn.Conv2d):
 
 
     def _forward(self, input, clip=False, deterministic=False, thresh=3):
-        log_alpha = self.clip(self.log_sigma2 - torch.log(self.weight ** 2))
+        log_alpha = self.clip(self.log_sigma2 - torch.log(self.weight ** 2 + 1e-8))
         clip_mask = torch.ge(log_alpha, thresh)
         W = self.weight
         zeros = torch.zeros_like(W)
         if deterministic:
-            conved = F.conv2d(input, torch.where(clip_mask, zero, self.weight),
+            conved = F.conv2d(input, torch.where(clip_mask, zeros, self.weight),
                 self.bias, self.stride,
                 self.padding, self.dilation, self.groups)
         else:
@@ -160,11 +162,11 @@ class Conv2DARD(nn.Conv2d):
                 W = torch.where(clip_mask, zeros, W)
             conved_mu = F.conv2d(input, W, self.bias, self.stride,
                 self.padding, self.dilation, self.groups)
-            covned_si = torch.sqrt(1e-8 + F.conv2d(input*input,
+            conved_si = torch.sqrt(1e-8 + F.conv2d(input*input,
                 torch.exp(log_alpha) * W * W, self.bias, self.stride,
                 self.padding, self.dilation, self.groups))
             conved = conved_mu + \
-                conved_si * torch.normal(torch.zeros_like(mu), torch.ones_like(mu))
+                conved_si * torch.normal(torch.zeros_like(conved_mu), torch.ones_like(conved_mu))
         return conved
 
     def eval_reg(self, **kwargs):
@@ -185,7 +187,7 @@ class Conv2DARD(nn.Conv2d):
         """
         Get number of dropped weights (greater than "thresh" parameter)
 
-        :returns (number of dropped weights, number of all weigths)
+        :returns (number of dropped weights, number of all weight)
         """
         log_alpha = self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
         params_cnt_dropped = int((log_alpha > thresh).sum().cpu().numpy())

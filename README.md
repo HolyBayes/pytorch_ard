@@ -9,32 +9,30 @@ and the Local Reparameterization Trick discovered in the paper helps to eliminat
 * **PyTorch** >= 0.4.0
 * **SkLearn** >= 0.19.1
 * **Pandas** >= 0.23.3
+* **Numpy** >= 1.14.5
 
-## Example
-```
-cd examples
-python boston_ard.py
-```
-
-## Benchmarks
+## Experiments
 
 ### Boston dataset
 
-Two scripts were used in the experiment: [boston_baseline.py](examples/boston_baseline.py) and [boston_ard.py](examples/boston_ard.py). Training procedure for each experiment was **100000 epoches, Adam(lr=1e-3)**. Baseline model was dense neural network with single hidden layer with hidden size 150.
+Two scripts were used in the experiment: [boston_baseline.py](experiments/boston/boston_baseline.py) and [boston_ard.py](experiments/boston/boston_ard.py). Training procedure for each experiment was **100000 epoches, Adam(lr=1e-3)**. Baseline model was dense neural network with single hidden layer with hidden size 150.
 
 |                | Baseline (nn.Linear) | LinearARD, no reg | LinearARD, reg=0.0001 | LinearARD, reg=0.001 | LinearARD, reg=0.1 | LinearARD, reg=1 |
 |----------------|----------|-------------|-----------------|----------------|--------------|------------|
 | MSE (train)    | 1.751    | 1.626       | <span style="color:green"><b>1.587</b></span>           | 1.962          | 17.167       | 33.682     |
-| MSE (test)     | <span style="color:red"><b>22.580</b></span>   | 16.229      | 20.950          | <span style="color:green"><b>8.416</b></span>          | 25.695       | 30.231     |
+| MSE (test)     | <span style="color:red"><b>22.580</b></span>   | 16.229      | <span style="color:green"><b>15.957</b></span>          | <span style="color:green"><b>8.416</b></span>          | 25.695       | 30.231     |
 | Compression, % | <span style="color:red"><b>0</b></span>        | 0.38        | <span style="color:green"><b>52.95</b></span>           | <span style="color:green"><b>64.19</b></span>          | <span style="color:green"><b>97.29</b></span>        | <span style="color:green"><b>99.29</b></span>      |
 
 You can see on the table above that variating regularization factor any degree of compression can be achieved (for example, ~99.29% of connections can be dropped if reg_factor=1 will be used). Moreover, you can see that training with LinearARD layers with some regularization parameters (like reg=0.001 in the table above) not only significantly reduces number of model parameters (>64% of parameters can be dropped after training), but also significantly increases quality on test, reducing overfitting.
 
+## Code description
+
+All layers implemented in [layers.py](layers.py) script. It contains to PyTorch layers implementations: **LinearARD** and **Conv2dARD**. It can be used as any other module and layer from "torch.nn.\*", but if there is still some misunderstanding about its usage see [experiments/models.py](experiments/models.py).
 
 
 ## TODO
 - [X] LinearARD layer implementation
-- [ ] Conv2DARD layer implementation
+- [X] Conv2dARD layer implementation
 
 ## Authors
 
