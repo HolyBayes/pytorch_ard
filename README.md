@@ -18,7 +18,7 @@ python boston_ard.py
 
 ## Benchmarks
 
-### Boston
+### Boston dataset
 
 Two scripts were used in the experiment: [boston_baseline.py](examples/boston_baseline.py) and [boston_ard.py](examples/boston_ard.py). Training procedure for each experiment was **100000 epoches, Adam(lr=1e-3)**. Baseline model was dense neural network with single hidden layer with hidden size 150.
 
@@ -28,13 +28,13 @@ Two scripts were used in the experiment: [boston_baseline.py](examples/boston_ba
 | MSE (test)     | <span style="color:red"><b>22.580</b></span>   | 16.229      | 20.950          | <span style="color:green"><b>8.416</b></span>          | 25.695       | 30.231     |
 | Compression, % | <span style="color:red"><b>0</b></span>        | 0.38        | <span style="color:green"><b>52.95</b></span>           | <span style="color:green"><b>64.19</b></span>          | <span style="color:green"><b>97.29</b></span>        | <span style="color:green"><b>99.29</b></span>      |
 
-You can see on the table above that variating regularization factor any degree of compression can be achieved (for example, ~99.29% of connections will be dropped if reg_factor=1 will be used). Moreover, you can see that training with LinearARD layers with some regularization parameters (like reg=0.001 in the table above) not only significantly reduces number of model parameters (>64% of parameters will be dropped after training), but also significantly increases quality on test, reducing overfitting.
+You can see on the table above that variating regularization factor any degree of compression can be achieved (for example, ~99.29% of connections can be dropped if reg_factor=1 will be used). Moreover, you can see that training with LinearARD layers with some regularization parameters (like reg=0.001 in the table above) not only significantly reduces number of model parameters (>64% of parameters can be dropped after training), but also significantly increases quality on test, reducing overfitting.
 
 
 
 ## TODO
-- [X] Linear layer implementation
-- [ ] Conv layers implementation
+- [X] LinearARD layer implementation
+- [ ] Conv2DARD layer implementation
 
 ## Authors
 
@@ -56,4 +56,4 @@ Artem Ryzhikov, LAMBDA laboratory, Higher School of Economics, Yandex School of 
 
 **Linkedin:** https://www.linkedin.com/in/artem-ryzhikov-2b6308103/
 
-**HSE profile:** https://www.hse.ru/org/persons/190912317
+**Link:** https://www.hse.ru/org/persons/190912317
