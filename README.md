@@ -52,6 +52,17 @@ Despite of high performance of implemented layers in "end-to-end" mode, authors 
 ```
 [Source code](https://github.com/ars-ashuha/variational-dropout-sparsifies-dnn) (Theano/Lasagne implementation)
 
+## Citation
+
+```
+@misc{VarDropPytorch,
+  author = {Artem Ryzhikov},
+  title = {Leensman/VarDropPytorch},
+  url = {https://github.com/Leensman/VarDropPytorch},
+  year = {2018}
+}
+```
+
 ## Contacts
 
 Artem Ryzhikov, LAMBDA laboratory, Higher School of Economics, Yandex School of Data Analysis
