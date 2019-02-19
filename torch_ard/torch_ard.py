@@ -71,13 +71,13 @@ class LinearARD(nn.Module):
             if clip:
                 W = torch.where(clip_mask, zeros, self.weight)
             mu = input.matmul(W.t())
-            si = torch.sqrt((input * input)\
-                .matmul(((torch.exp(log_alpha) * self.weight * self.weight)+1e-8).t()))
+            si = torch.sqrt((input * input) \
+                            .matmul(((torch.exp(log_alpha) * self.weight * self.weight)+1e-8).t()))
             activation = mu + torch.normal(torch.zeros_like(mu), torch.ones_like(mu)) * si
         return activation + self.bias
 
 
-    def eval_reg(self, **kwargs):
+    def get_reg(self, **kwargs):
         """
         Get weights regularization (KL(q(w)||p(w)) approximation)
         """
@@ -91,20 +91,17 @@ class LinearARD(nn.Module):
             self.in_features, self.out_features, self.bias is not None
         )
 
-    def get_ard(self, thresh=3, **kwargs):
+    def get_dropped_params_cnt(self, thresh=3, **kwargs):
         """
-        Get number of dropped weights (greater than "thresh" parameter)
+        Get fraction of dropped weights (with log alpha greater than "thresh" parameter)
 
         :returns (number of dropped weights, number of all weight)
         """
-        log_alpha = self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
-        params_cnt_dropped = int((log_alpha > thresh).sum().cpu().numpy())
-        params_cnt_all = reduce(operator.mul, log_alpha.shape, 1)
-        return params_cnt_dropped, params_cnt_all
+        log_alpha = self.log_alpha()
+        return int((log_alpha > thresh).sum().cpu().numpy())
 
-    def get_reg(self):
-        log_alpha = self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
-        return log_alpha.min(), log_alpha.max()
+    def log_alpha(self):
+        return self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
 
 class Conv2dARD(nn.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
@@ -169,7 +166,7 @@ class Conv2dARD(nn.Conv2d):
                 conved_si * torch.normal(torch.zeros_like(conved_mu), torch.ones_like(conved_mu))
         return conved
 
-    def eval_reg(self, **kwargs):
+    def get_reg(self, **kwargs):
         """
         Get weights regularization (KL(q(w)||p(w)) approximation)
         """
@@ -183,17 +180,40 @@ class Conv2dARD(nn.Conv2d):
             self.in_features, self.out_features, self.bias is not None
         )
 
-    def get_ard(self, thresh=3, **kwargs):
+    def get_dropped_params_cnt(self, thresh=3, **kwargs):
         """
         Get number of dropped weights (greater than "thresh" parameter)
 
         :returns (number of dropped weights, number of all weight)
         """
         log_alpha = self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
-        params_cnt_dropped = int((log_alpha > thresh).sum().cpu().numpy())
-        params_cnt_all = reduce(operator.mul, log_alpha.shape, 1)
-        return params_cnt_dropped, params_cnt_all
+        return int((log_alpha > thresh).sum().cpu().numpy())
 
-    def get_reg(self):
-        log_alpha = self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
-        return log_alpha.min(), log_alpha.max()
+    def log_alpha(self):
+        return self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
+
+
+def get_ard_reg(module, reg=0):
+    """
+
+    :param module: model to evaluate ard regularization for
+    :param reg: auxilary cumulative variable for recursion
+    :return: total regularization for module
+    """
+    if isinstance(module, LinearARD) or isinstance(module, Conv2dARD): return reg + module.get_reg()
+    if hasattr(module, 'children'): return reg + sum([get_ard_reg(submodule) for submodule in module.children()])
+    return reg
+
+def _get_dropped_params_cnt(module, cnt=0):
+    if hasattr(module, 'get_dropped_params_cnt'): return cnt + module.get_dropped_params_cnt()
+    if hasattr(module, 'children'): return cnt + sum([_get_dropped_params_cnt(submodule) for submodule in module.children()])
+    return cnt
+
+def _get_params_cnt(module, cnt=0):
+    if any([isinstance(module, LinearARD), isinstance(module, Conv2dARD)]): return cnt + reduce(operator.mul, module.weight.shape, 1)
+    if hasattr(module, 'children'): return cnt + sum(
+        [_get_params_cnt(submodule) for submodule in module.children()])
+    return cnt + sum(p.numel() for p in module.parameters())
+
+def get_dropped_params_ratio(model):
+    return _get_dropped_params_cnt(model)*1.0/_get_params_cnt(model)

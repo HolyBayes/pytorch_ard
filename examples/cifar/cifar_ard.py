@@ -12,6 +12,7 @@ import os, sys
 sys.path.append('../')
 
 from models import LeNetARD
+from torch_ard import get_ard_reg, get_dropped_params_ratio
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -75,7 +76,7 @@ def train(epoch):
         optimizer.zero_grad()
         outputs = model(inputs)
         loss = criterion(outputs, targets) + \
-            trainloader.batch_size * reg_factor * model.eval_reg() / len(trainset)
+            trainloader.batch_size * reg_factor * get_ard_reg(model) / len(trainset)
         loss.backward()
         optimizer.step()
 
@@ -107,7 +108,7 @@ def test(epoch):
     acc = 100.*correct/total
     print('Test loss: %.2f' % np.mean(test_loss))
     print('Test accuracy: %.2f%%' % acc)
-    print('Compression: %.2f%%' % (100.*model.eval_compression()))
+    print('Compression: %.2f%%' % (100.*get_dropped_params_ratio(model)))
     if acc > best_acc:
         print('Saving..')
         state = {

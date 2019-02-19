@@ -1,4 +1,6 @@
 *.pyc
-experiments/*/data/*
-experiments/*/checkpoint/*
+examples/*/data/**
+examples/*/checkpoint/*
 __pycache__
+dist
+.idea

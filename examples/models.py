@@ -1,7 +1,4 @@
-import sys
-sys.path.append('../')
-sys.path.append('../../')
-from layers import LinearARD, Conv2dARD
+import torch_ard as nn_ard
 from torch import nn
 import torch.nn.functional as F
 import torch
@@ -9,8 +6,8 @@ import torch
 class DenseModelARD(nn.Module):
     def __init__(self, input_shape, output_shape, hidden_size=150, activation=None):
         super(DenseModelARD, self).__init__()
-        self.l1 = LinearARD(input_shape, hidden_size)
-        self.l2 = LinearARD(hidden_size, output_shape)
+        self.l1 = nn_ard.LinearARD(input_shape, hidden_size)
+        self.l2 = nn_ard.LinearARD(hidden_size, output_shape)
         self.activation = activation
 
     def forward(self, input):
@@ -28,14 +25,6 @@ class DenseModelARD(nn.Module):
         if self.activation: x = self.activation(x)
         return x
 
-    def eval_reg(self):
-        return self.l1.eval_reg() + self.l2.eval_reg()
-
-    def eval_compression(self, thresh=3):
-        l1_params_cnt_dropped, l1_params_cnt_all = self.l1.get_ard(thresh=thresh)
-        l2_params_cnt_dropped, l2_params_cnt_all = self.l2.get_ard(thresh=thresh)
-        return (l1_params_cnt_dropped + l2_params_cnt_dropped) / \
-            (l1_params_cnt_all + l2_params_cnt_all)
 
 class DenseModel(nn.Module):
     def __init__(self, input_shape, output_shape, hidden_size=150, activation=None):
@@ -76,10 +65,10 @@ class LeNet(nn.Module):
 class LeNetARD(nn.Module):
     def __init__(self, input_shape, output_shape):
         super(LeNetARD, self).__init__()
-        self.conv1 = Conv2dARD(input_shape, 20, 5)
-        self.conv2 = Conv2dARD(20, 50, 5)
-        self.l1 = LinearARD(50*5*5, 500)
-        self.l2 = LinearARD(500, output_shape)
+        self.conv1 = nn_ard.Conv2dARD(input_shape, 20, 5)
+        self.conv2 = nn_ard.Conv2dARD(20, 50, 5)
+        self.l1 = nn_ard.LinearARD(50*5*5, 500)
+        self.l2 = nn_ard.LinearARD(500, output_shape)
 
     def forward(self, input):
         return self._forward(input)
@@ -97,11 +86,6 @@ class LeNetARD(nn.Module):
         out = F.relu(self.l1._forward(out, clip, deterministic, thresh))
         return F.log_softmax(self.l2._forward(out, clip, deterministic, thresh), dim=1)
 
-    def eval_reg(self):
-        return sum([l.eval_reg() for l in [self.conv1, self.conv2, self.l1, self.l2]])
-
-    def eval_compression(self, thresh=3):
-        return sum([l.get_ard()[0] for l in [self.conv1, self.conv2, self.l1, self.l2]]) * 1.0 / sum([l.get_ard()[1] for l in [self.conv1, self.conv2, self.l1, self.l2]])
 
 class LeNet_MNIST(LeNet):
     def __init__(self, input_shape, output_shape):
@@ -111,4 +95,4 @@ class LeNet_MNIST(LeNet):
 class LeNetARD_MNIST(LeNetARD):
     def __init__(self, input_shape, output_shape):
         super(LeNetARD_MNIST, self).__init__(input_shape, output_shape)
-        self.l1 = LinearARD(50*4*4, 500)
+        self.l1 = nn_ard.LinearARD(50*4*4, 500)
