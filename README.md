@@ -1,4 +1,4 @@
-# Variational Dropout Sparsifies DNN (Pytorch)
+# Variational Dropout Sparsifies NN (Pytorch)
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/pytorch-ard.svg)](https://badge.fury.io/py/pytorch-ard)
 
