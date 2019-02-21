@@ -2,6 +2,9 @@
 [![license](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](LICENSE)
 [![PyPI version](https://badge.fury.io/py/pytorch-ard.svg)](https://badge.fury.io/py/pytorch-ard)
 
+
+Make your neural network 300 times faster!
+
 Pytorch implementation of Variational Dropout Sparsifies Deep Neural Networks ([arxiv:1701.05369](https://arxiv.org/abs/1701.05369)).
 
 ## Description
