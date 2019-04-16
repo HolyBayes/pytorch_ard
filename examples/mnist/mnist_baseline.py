@@ -10,6 +10,7 @@ import numpy as np
 
 import os, sys
 sys.path.append('../')
+import time
 
 from models import LeNet_MNIST
 
@@ -46,7 +47,7 @@ testset = datasets.MNIST('./data', train=False, transform=transforms.Compose([
                    transforms.ToTensor(),
                    transforms.Normalize((0.1307,), (0.3081,))
                ]))
-testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=True)
+testloader = torch.utils.data.DataLoader(testset, batch_size=1000, shuffle=True)
 
 
 n_classes = 10
@@ -66,7 +67,8 @@ if os.path.isfile(ckpt_file):
     start_epoch = checkpoint['epoch']
 
 criterion = nn.NLLLoss()
-optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, weight_decay=5e-4)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
 # Training
 def train(epoch):
@@ -81,7 +83,8 @@ def train(epoch):
         outputs = model(inputs)
         loss = criterion(outputs, targets)
         loss.backward()
-        optimizer.step()
+        # scheduler.step(loss)
+        optimizer.step(loss)
 
         train_loss.append(loss.item())
         _, predicted = outputs.max(1)
@@ -96,10 +99,13 @@ def test(epoch):
     test_loss = []
     correct = 0
     total = 0
+    inference_time_seconds = 0
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(testloader):
             inputs, targets = inputs.to(device), targets.to(device)
+            start_ts = time.time()
             outputs = model(inputs)
+            inference_time_seconds += time.time() - start_ts
             loss = criterion(outputs, targets)
 
             test_loss.append(loss.item())
@@ -111,6 +117,7 @@ def test(epoch):
     acc = 100.*correct/total
     print('Test loss: %.3f' % np.mean(test_loss))
     print('Test accuracy: %.3f%%' % acc)
+    print('Inference time: %.2f seconds' % inference_time_seconds)
     if acc > best_acc:
         print('Saving..')
         state = {

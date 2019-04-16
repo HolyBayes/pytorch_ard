@@ -15,8 +15,7 @@ class DenseModelARD(nn.Module):
         return self._forward(input)
 
     def predict(self, input, clip=False, deterministic=True, thresh=3):
-        with torch.no_grad():
-            return self._forward(input, clip, deterministic, thresh=thresh)
+        return self._forward(input, clip, deterministic, thresh=thresh)
 
     def _forward(self, input, clip=False, deterministic=False, thresh=3):
         x = input
@@ -48,8 +47,7 @@ class DenseModel(nn.Module):
         return x
 
     def predict(self, input):
-        with torch.no_grad():
-            return self.forward(input)
+        return self.forward(input)
 
     def _init_weights(self):
         for layer in self.children():
@@ -90,8 +88,7 @@ class LeNetARD(nn.Module):
         return self._forward(input)
 
     def predict(self, input, clip=False, deterministic=True, thresh=3):
-        with torch.no_grad():
-            return self._forward(input, clip, deterministic, thresh=thresh)
+        return self._forward(input, clip, deterministic, thresh=thresh)
 
     def _forward(self, x, clip=False, deterministic=False, thresh=3):
         out = F.relu(self.conv1._forward(x, clip, deterministic, thresh))

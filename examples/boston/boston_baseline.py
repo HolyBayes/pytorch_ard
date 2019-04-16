@@ -21,7 +21,8 @@ train_X, test_X, train_y, test_y = \
 
 model = DenseModel(input_shape=train_X.shape[1], output_shape=1,
         activation=nn.functional.relu).to(device)
-opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+opt = torch.optim.Adam(model.parameters(), lr=1e-2)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, 'min')
 criterion = nn.MSELoss()
 
 n_epoches = 100000
@@ -32,6 +33,7 @@ for epoch in range(n_epoches):
     preds = model(train_X).squeeze()
     loss = criterion(preds, train_y)
     loss.backward()
+    # scheduler.step(loss)
     opt.step()
     loss_train = float(criterion(preds, train_y).detach().cpu().numpy())
     preds = model.predict(test_X).squeeze()

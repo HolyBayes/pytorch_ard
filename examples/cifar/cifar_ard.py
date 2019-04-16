@@ -60,8 +60,8 @@ if os.path.isfile(ckpt_file):
     start_epoch = checkpoint['epoch']
 
 criterion = nn.NLLLoss()
-optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
-
+optimizer = optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, weight_decay=5e-4)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
 
 # Training
@@ -78,6 +78,7 @@ def train(epoch):
         loss = criterion(outputs, targets) + \
             trainloader.batch_size * reg_factor * get_ard_reg(model) / len(trainset)
         loss.backward()
+        # scheduler.step(loss)
         optimizer.step()
 
         train_loss.append(loss.item())
