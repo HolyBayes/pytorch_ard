@@ -9,6 +9,7 @@ class DenseModelARD(nn.Module):
         self.l1 = nn_ard.LinearARD(input_shape, hidden_size)
         self.l2 = nn_ard.LinearARD(hidden_size, output_shape)
         self.activation = activation
+        self._init_weights()
 
     def forward(self, input):
         return self._forward(input)
@@ -25,6 +26,10 @@ class DenseModelARD(nn.Module):
         if self.activation: x = self.activation(x)
         return x
 
+    def _init_weights(self):
+        for layer in self.children():
+            if hasattr(layer, 'weight'): nn.init.xavier_uniform(layer.weight, gain=nn.init.calculate_gain('relu'))
+
 
 class DenseModel(nn.Module):
     def __init__(self, input_shape, output_shape, hidden_size=150, activation=None):
@@ -32,6 +37,7 @@ class DenseModel(nn.Module):
         self.l1 = nn.Linear(input_shape, hidden_size)
         self.l2 = nn.Linear(hidden_size, output_shape)
         self.activation = activation
+        self._init_weights()
 
     def forward(self, input):
         x = input
@@ -45,6 +51,10 @@ class DenseModel(nn.Module):
         with torch.no_grad():
             return self.forward(input)
 
+    def _init_weights(self):
+        for layer in self.children():
+            if hasattr(layer, 'weight'): nn.init.xavier_uniform(layer.weight, gain=nn.init.calculate_gain('relu'))
+
 class LeNet(nn.Module):
     def __init__(self, input_shape, output_shape):
         super(LeNet, self).__init__()
@@ -52,6 +62,7 @@ class LeNet(nn.Module):
         self.conv2 = nn.Conv2d(20, 50, 5)
         self.l1 = nn.Linear(50*5*5, 500)
         self.l2 = nn.Linear(500, output_shape)
+        self._init_weights()
 
     def forward(self, x):
         out = F.relu(self.conv1(x))
@@ -62,6 +73,10 @@ class LeNet(nn.Module):
         out = F.relu(self.l1(out))
         return F.log_softmax(self.l2(out), dim=1)
 
+    def _init_weights(self):
+        for layer in self.children():
+            if hasattr(layer, 'weight'): nn.init.xavier_uniform(layer.weight, gain=nn.init.calculate_gain('relu'))
+
 class LeNetARD(nn.Module):
     def __init__(self, input_shape, output_shape):
         super(LeNetARD, self).__init__()
@@ -69,6 +84,7 @@ class LeNetARD(nn.Module):
         self.conv2 = nn_ard.Conv2dARD(20, 50, 5)
         self.l1 = nn_ard.LinearARD(50*5*5, 500)
         self.l2 = nn_ard.LinearARD(500, output_shape)
+        self._init_weights()
 
     def forward(self, input):
         return self._forward(input)
@@ -86,13 +102,19 @@ class LeNetARD(nn.Module):
         out = F.relu(self.l1._forward(out, clip, deterministic, thresh))
         return F.log_softmax(self.l2._forward(out, clip, deterministic, thresh), dim=1)
 
+    def _init_weights(self):
+        for layer in self.children():
+            if hasattr(layer, 'weight'): nn.init.xavier_uniform(layer.weight, gain=nn.init.calculate_gain('relu'))
+
 
 class LeNet_MNIST(LeNet):
     def __init__(self, input_shape, output_shape):
         super(LeNet_MNIST, self).__init__(input_shape, output_shape)
         self.l1 = nn.Linear(50*4*4, 500)
+        super(LeNet_MNIST, self)._init_weights()
 
 class LeNetARD_MNIST(LeNetARD):
     def __init__(self, input_shape, output_shape):
         super(LeNetARD_MNIST, self).__init__(input_shape, output_shape)
         self.l1 = nn_ard.LinearARD(50*4*4, 500)
+        super(LeNetARD_MNIST, self)._init_weights()
