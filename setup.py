@@ -26,10 +26,6 @@ setup(
         'scikit-learn>=0.19.2',
         'pandas',
         'pytorch_scatter @ git+https://github.com/rusty1s/pytorch_scatter.git@master',
-        'TorchSparse'
-    ],
-    dependency_links=[
-        'git+https://github.com/rusty1s/pytorch_sparse.git@master#egg=TorchSparse-0',
-        'TorchScatter @ https://github.com/rusty1s/pytorch_scatter.git@master'
+        'pytorch_sparse @ git+https://github.com/rusty1s/pytorch_sparse.git@master'
     ]
 )
