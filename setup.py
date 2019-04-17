@@ -25,7 +25,8 @@ setup(
         'torchvision>=0.2.1',
         'scikit-learn>=0.19.2',
         'pandas',
-        'torch_scatter'       
+        'torch_scatter',
+        'pytorch_sparse'
     ],
-    dependency_links=['git+ssh://git@github.com:rusty1s/pytorch_sparse.git']
+    dependency_links=['git+ssh://git@github.com:rusty1s/pytorch_sparse.git#egg==pytorch_sparse']
 )
