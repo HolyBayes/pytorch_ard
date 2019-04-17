@@ -37,8 +37,16 @@ model(input)
 
 ## Installation
 
+### Using pip
+
 ```
 pip install pytorch-ard
+```
+
+### Alternative way
+
+```
+pip install git+https://github.com/HolyBayes/pytorch_ard
 ```
 
 ## Experiments

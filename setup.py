@@ -27,5 +27,5 @@ setup(
         'pandas',
         'torch_scatter'       
     ],
-    dependency_links=['git+https://github.com/rusty1s/pytorch_sparse']
+    dependency_links=['git+ssh://git@github.com:rusty1s/pytorch_sparse.git']
 )
