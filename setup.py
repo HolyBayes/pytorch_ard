@@ -25,7 +25,7 @@ setup(
         'torchvision>=0.2.1',
         'scikit-learn>=0.19.2',
         'pandas',
-        'TorchScatter',
+        'pytorch_scatter @ git+https://github.com/rusty1s/pytorch_scatter.git@master',
         'TorchSparse'
     ],
     dependency_links=[
