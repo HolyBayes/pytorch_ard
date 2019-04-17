@@ -29,6 +29,10 @@ model = nn.Sequential(
 reg_factor = 1.0
 criterion = lambda input, target: F.binary_cross_entropy(input, target) + reg_factor*nn_ard.get_ard_reg(model)
 print('Sparsification ratio: %.3f%%' % (100.*nn_ard.get_dropped_params_ratio(model)))
+
+# test stage
+model.eval() # Needed for speed-up
+model(input)
 ```
 
 ## Installation
@@ -69,7 +73,7 @@ You can see on the table above that variating regularization factor any degree o
 - [X] LinearARD layer implementation
 - [X] Conv2dARD layer implementation
 - [ ] Learnable bias for Conv2dARD
-- [ ] Implement *to_sparse(model)* utility
+- [x] Implement *to_sparse(model)* utility
 
 ## Authors
 
