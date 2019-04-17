@@ -12,16 +12,10 @@ class DenseModelARD(nn.Module):
         self._init_weights()
 
     def forward(self, input):
-        return self._forward(input)
-
-    def predict(self, input, clip=False, deterministic=True, thresh=3):
-        return self._forward(input, clip, deterministic, thresh=thresh)
-
-    def _forward(self, input, clip=False, deterministic=False, thresh=3):
         x = input
-        x = self.l1._forward(x, clip=clip, deterministic=deterministic, thresh=thresh)
+        x = self.l1(x)
         x = nn.functional.tanh(x)
-        x = self.l2._forward(x, clip=clip, deterministic=deterministic, thresh=thresh)
+        x = self.l2(x)
         if self.activation: x = self.activation(x)
         return x
 
@@ -45,9 +39,6 @@ class DenseModel(nn.Module):
         x = self.l2(x)
         if self.activation: x = self.activation(x)
         return x
-
-    def predict(self, input):
-        return self.forward(input)
 
     def _init_weights(self):
         for layer in self.children():
@@ -85,19 +76,13 @@ class LeNetARD(nn.Module):
         self._init_weights()
 
     def forward(self, input):
-        return self._forward(input)
-
-    def predict(self, input, clip=False, deterministic=True, thresh=3):
-        return self._forward(input, clip, deterministic, thresh=thresh)
-
-    def _forward(self, x, clip=False, deterministic=False, thresh=3):
-        out = F.relu(self.conv1._forward(x, clip, deterministic, thresh))
+        out = F.relu(self.conv1(input))
         out = F.max_pool2d(out, 2)
-        out = F.relu(self.conv2._forward(out, clip, deterministic, thresh))
+        out = F.relu(self.conv2(out))
         out = F.max_pool2d(out, 2)
         out = out.view(out.shape[0], -1)
-        out = F.relu(self.l1._forward(out, clip, deterministic, thresh))
-        return F.log_softmax(self.l2._forward(out, clip, deterministic, thresh), dim=1)
+        out = F.relu(self.l1(out))
+        return F.log_softmax(self.l2(out), dim=1)
 
     def _init_weights(self):
         for layer in self.children():

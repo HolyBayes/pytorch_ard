@@ -4,23 +4,44 @@ from torch.nn import Parameter
 import torch.nn.functional as F
 from functools import reduce
 import operator
+import torch_sparse
+
 
 class LinearARD(nn.Module):
     """
     Dense layer implementation with weights ARD-prior (arxiv:1701.05369)
     """
 
-    def __init__(self, in_features, out_features, bias=True):
+    def __init__(self, in_features, out_features, bias=True, thresh=3):
         super(LinearARD, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.Tensor(out_features, in_features))
+        self.thresh = thresh
         if bias:
             self.bias = Parameter(torch.Tensor(out_features))
         else:
             self.register_parameter('bias', None)
         self.log_sigma2 = Parameter(torch.Tensor(out_features, in_features))
         self.reset_parameters()
+
+    def forward(self, input):
+        """
+        Forward with all regularized connections and random activations (Beyesian mode). Typically used for train
+        """
+        if self.training == False:
+            out = torch_sparse.spmm(self.weight_indices, self.weight_values, self.out_features, input.t()).t()
+            # out = input.matmul(self.weight_clipped.t())
+            return out + self.bias
+
+        clip_mask = self.get_clip_mask()
+        W = self.weight
+        zeros = torch.zeros_like(W)
+        mu = input.matmul(W.t())
+        si = torch.sqrt((input * input) \
+                        .matmul(((torch.exp(self.log_alpha) * self.weight * self.weight)+1e-8).t()))
+        activation = mu + torch.normal(torch.zeros_like(mu), torch.ones_like(mu)) * si
+        return activation + self.bias
 
     def reset_parameters(self):
         self.weight.data.normal_(std=0.01)
@@ -35,46 +56,22 @@ class LinearARD(nn.Module):
         """
         return torch.clamp(tensor, -to, to)
 
-    def forward(self, input):
-        """
-        Forward with all regularized connections and random activations (Beyesian mode). Typically used for train
-        """
-        return self._forward(input)
 
-    def forward_w_clip(self, input, thresh=3):
-        """
-        Forward with dropped unsignificant connections and random activations (Bayesian mode)
+    def get_clip_mask(self):
+        log_alpha = self.clip(self.log_alpha)
+        return torch.ge(log_alpha, self.thresh)
 
-        :param input - input Tensor
-        :param thresh - all weights greater "thresh" parameter will be dropped (unsignificant connections)
-        """
-        return self._forward(input, clip=True, thresh=thresh)
+    def _update_sparse_weights(self):
+        clip_mask = self.get_clip_mask()
+        self.weight_indices = (clip_mask == 0).nonzero().t()
+        self.weight_values = self.weight[1-clip_mask]
+        self.weight_clipped = torch.where(clip_mask, torch.zeros_like(self.weight), self.weight)
 
-    def forward_deterministic(self, input, thresh=3):
-        """
-        Forward with dropped unsignificant connections with deterministic weights. Typically used in test.
-        Without regularization and high enough "thresh" parameter (>= 3) it's mode equivalent to simle nn.Linear layer
-
-        :param input - input Tensor
-        :param thresh - all weights greater "thresh" parameter will be dropped (unsignificant connections)
-        """
-        return self._forward(input, deterministic=True, thresh=thresh)
-
-    def _forward(self, input, clip=False, deterministic=False, thresh=3):
-        log_alpha = self.clip(self.log_sigma2 - torch.log(self.weight ** 2))
-        clip_mask = torch.ge(log_alpha, thresh)
-        W = self.weight
-        zeros = torch.zeros_like(W)
-        if deterministic:
-            activation = input.matmul(torch.where(clip_mask, zeros, self.weight).t())
-        else:
-            if clip:
-                W = torch.where(clip_mask, zeros, self.weight)
-            mu = input.matmul(W.t())
-            si = torch.sqrt((input * input) \
-                            .matmul(((torch.exp(log_alpha) * self.weight * self.weight)+1e-8).t()))
-            activation = mu + torch.normal(torch.zeros_like(mu), torch.ones_like(mu)) * si
-        return activation + self.bias
+    def train(self, mode):
+        if mode == False:
+            self._update_sparse_weights()
+        self.training = mode
+        super(LinearARD, self).train(mode)
 
 
     def get_reg(self, **kwargs):
@@ -82,7 +79,7 @@ class LinearARD(nn.Module):
         Get weights regularization (KL(q(w)||p(w)) approximation)
         """
         k1, k2, k3 = 0.63576, 1.8732, 1.48695; C = -k1
-        log_alpha = self.clip(self.log_sigma2 - torch.log(self.weight ** 2))
+        log_alpha = self.clip(self.log_alpha)
         mdkl = k1 * torch.sigmoid(k2 + k3 * log_alpha) - 0.5 * torch.log1p(torch.exp(-log_alpha)) + C
         return -torch.sum(mdkl)
 
@@ -91,26 +88,35 @@ class LinearARD(nn.Module):
             self.in_features, self.out_features, self.bias is not None
         )
 
-    def get_dropped_params_cnt(self, thresh=3, **kwargs):
+    def get_dropped_params_cnt(self):
         """
-        Get fraction of dropped weights (with log alpha greater than "thresh" parameter)
+        Get number of dropped weights (with log alpha greater than "thresh" parameter)
 
         :returns (number of dropped weights, number of all weight)
         """
-        log_alpha = self.log_alpha()
-        return int((log_alpha > thresh).sum().cpu().numpy())
+        return self.get_clip_mask().sum().cpu().numpy()
 
+    @property    
     def log_alpha(self):
-        return self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
+        eps = 1e-8
+        return self.log_sigma2 - 2 * torch.log(torch.abs(self.weight)+eps)
+
+    # def to_sparse(self):
+
 
 class Conv2dARD(nn.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, ard_init=-10):
+                 padding=0, dilation=1, groups=1, ard_init=-10, thresh=3):
         bias = None # Learnable bias is not implemented yet
         super(Conv2dARD, self).__init__(in_channels, out_channels, kernel_size, stride,
                      padding, dilation, groups, bias)
+        self.thresh = thresh
+        self.bias = bias
+        self.in_channels = in_channels
+        self.out_channels = out_channels
         self.ard_init = ard_init
         self.log_sigma2 = Parameter(ard_init*torch.ones_like(self.weight))
+
 
     @staticmethod
     def clip(tensor, to=8):
@@ -123,74 +129,65 @@ class Conv2dARD(nn.Conv2d):
         """
         Forward with all regularized connections and random activations (Beyesian mode). Typically used for train
         """
-        return self._forward(input)
-
-    def forward_w_clip(self, input, thresh=3):
-        """
-        Forward with dropped unsignificant connections and random activations (Bayesian mode)
-
-        :param input - input Tensor
-        :param thresh - all weights greater "thresh" parameter will be dropped (unsignificant connections)
-        """
-        return self._forward(input, clip=True, thresh=thresh)
-
-    def forward_deterministic(self, input, thresh=3):
-        """
-        Forward with dropped unsignificant connections with deterministic weights. Typically used in test.
-        Without regularization and high enough "thresh" parameter (>= 3) it's mode equivalent to simle nn.Linear layer
-
-        :param input - input Tensor
-        :param thresh - all weights greater "thresh" parameter will be dropped (unsignificant connections)
-        """
-        return self._forward(input, deterministic=True, thresh=thresh)
-
-
-    def _forward(self, input, clip=False, deterministic=False, thresh=3):
-        log_alpha = self.clip(self.log_sigma2 - torch.log(self.weight ** 2 + 1e-8))
-        clip_mask = torch.ge(log_alpha, thresh)
-        W = self.weight
-        zeros = torch.zeros_like(W)
-        if deterministic:
-            conved = F.conv2d(input, torch.where(clip_mask, zeros, self.weight),
+        if self.training == False:
+            return F.conv2d(input, self.weights_clipped,
                 self.bias, self.stride,
                 self.padding, self.dilation, self.groups)
-        else:
-            if clip:
-                W = torch.where(clip_mask, zeros, W)
-            conved_mu = F.conv2d(input, W, self.bias, self.stride,
-                self.padding, self.dilation, self.groups)
-            conved_si = torch.sqrt(1e-8 + F.conv2d(input*input,
-                torch.exp(log_alpha) * W * W, self.bias, self.stride,
-                self.padding, self.dilation, self.groups))
-            conved = conved_mu + \
-                conved_si * torch.normal(torch.zeros_like(conved_mu), torch.ones_like(conved_mu))
+        
+        W = self.weight
+        zeros = torch.zeros_like(W)
+        clip_mask = self.get_clip_mask()
+        conved_mu = F.conv2d(input, W, self.bias, self.stride,
+            self.padding, self.dilation, self.groups)
+        conved_si = torch.sqrt(1e-8 + F.conv2d(input*input,
+            torch.exp(self.log_alpha) * W * W, self.bias, self.stride,
+            self.padding, self.dilation, self.groups))
+        conved = conved_mu + \
+            conved_si * torch.normal(torch.zeros_like(conved_mu), torch.ones_like(conved_mu))
         return conved
+
+    
+    def get_clip_mask(self):
+        log_alpha = self.clip(self.log_alpha)
+        return torch.ge(log_alpha, self.thresh)
+
+    def _update_sparse_weights(self):
+        clip_mask = self.get_clip_mask()
+        self.weights_clipped = torch.where(clip_mask, torch.zeros_like(self.weight), self.weight)
+
+    def train(self, mode):
+        if mode == False:
+            self._update_sparse_weights()
+        self.training = mode
+        super(Conv2dARD, self).train(mode)
 
     def get_reg(self, **kwargs):
         """
         Get weights regularization (KL(q(w)||p(w)) approximation)
         """
         k1, k2, k3 = 0.63576, 1.8732, 1.48695; C = -k1
-        log_alpha = self.clip(self.log_sigma2 - torch.log(self.weight ** 2))
+        log_alpha = self.clip(self.log_alpha)
         mdkl = k1 * torch.sigmoid(k2 + k3 * log_alpha) - 0.5 * torch.log1p(torch.exp(-log_alpha)) + C
         return -torch.sum(mdkl)
 
     def extra_repr(self):
         return 'in_features={}, out_features={}, bias={}'.format(
-            self.in_features, self.out_features, self.bias is not None
+            self.in_channels, self.out_channels, self.bias is not None
         )
 
-    def get_dropped_params_cnt(self, thresh=3, **kwargs):
+    def get_dropped_params_cnt(self):
         """
         Get number of dropped weights (greater than "thresh" parameter)
 
         :returns (number of dropped weights, number of all weight)
         """
-        log_alpha = self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
-        return int((log_alpha > thresh).sum().cpu().numpy())
+        return self.get_clip_mask().sum().cpu().numpy()
 
+    @property
     def log_alpha(self):
-        return self.log_sigma2 - 2 * torch.log(torch.abs(self.weight))
+        eps = 1e-8
+        return self.log_sigma2 - 2 * torch.log(torch.abs(self.weight) + eps)
+
 
 
 def get_ard_reg(module, reg=0):
@@ -217,3 +214,4 @@ def _get_params_cnt(module, cnt=0):
 
 def get_dropped_params_ratio(model):
     return _get_dropped_params_cnt(model)*1.0/_get_params_cnt(model)
+      

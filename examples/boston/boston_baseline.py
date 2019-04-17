@@ -2,7 +2,7 @@ import sys
 sys.path.append('../')
 from models import DenseModel
 from sklearn.datasets import load_boston
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 import pandas as pd
 from torch import nn
 import torch
@@ -36,7 +36,7 @@ for epoch in range(n_epoches):
     # scheduler.step(loss)
     opt.step()
     loss_train = float(criterion(preds, train_y).detach().cpu().numpy())
-    preds = model.predict(test_X).squeeze()
+    preds = model(test_X).squeeze()
     loss_test = float(criterion(preds, test_y).detach().cpu().numpy())
     if epoch % debug_frequency == 0:
         print('%d epoch' % epoch)

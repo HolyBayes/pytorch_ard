@@ -21,8 +21,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ckpt_file = 'checkpoint/ckpt_ard.t7'
 
 best_acc = 0  # best test accuracy
+best_compression = 0
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
-reg_factor = 1e-4
+reg_factor = 1
 
 # Data
 print('==> Preparing data..')
@@ -49,7 +50,7 @@ testset = datasets.MNIST('./data', train=False, transform=transforms.Compose([
                    transforms.ToTensor(),
                    transforms.Normalize((0.1307,), (0.3081,))
                ]))
-testloader = torch.utils.data.DataLoader(testset, batch_size=1000, shuffle=True)
+testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=True)
 
 n_classes = 10
 
@@ -68,7 +69,7 @@ if os.path.isfile(ckpt_file):
     start_epoch = checkpoint['epoch']
 
 criterion = nn.NLLLoss()
-optimizer = optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
 # Training
@@ -97,6 +98,7 @@ def train(epoch):
 
 def test(epoch):
     global best_acc
+    global best_compression
     model.eval()
     test_loss = []
     correct = 0
@@ -106,7 +108,7 @@ def test(epoch):
         for batch_idx, (inputs, targets) in enumerate(testloader):
             inputs, targets = inputs.to(device), targets.to(device)
             start_ts = time.time()
-            outputs = model.predict(inputs)
+            outputs = model(inputs)
             inference_time_seconds += time.time() - start_ts
             loss = criterion(outputs, targets)
 
@@ -117,21 +119,25 @@ def test(epoch):
 
     # Save checkpoint.
     acc = 100.*correct/total
+    compression = 100.*get_dropped_params_ratio(model)
     print('Test loss: %.3f' % np.mean(test_loss))
     print('Test accuracy: %.3f%%' % acc)
-    print('Compression: %.2f%%' % (100.*get_dropped_params_ratio(model)))
+    print('Compression: %.2f%%' % compression)
     print('Inference time: %.2f seconds' % inference_time_seconds)
-    if acc > best_acc:
+    # if acc > best_acc:
+    if compression > best_compression:
         print('Saving..')
         state = {
             'net': model.state_dict(),
             'acc': acc,
             'epoch': epoch,
+            'compression': compression
         }
         if not os.path.isdir('checkpoint'):
             os.mkdir('checkpoint')
         torch.save(state, ckpt_file)
-        best_acc = acc
+        # best_acc = acc
+        best_compression = compression
 
 
 for epoch in range(start_epoch, start_epoch+100):

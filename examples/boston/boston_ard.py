@@ -2,7 +2,7 @@ import sys
 sys.path.append('../')
 from models import DenseModelARD
 from sklearn.datasets import load_boston
-from sklearn.cross_validation import train_test_split
+from sklearn.model_selection import train_test_split
 import pandas as pd
 from torch import nn
 import torch
@@ -23,13 +23,13 @@ train_X, test_X, train_y, test_y = \
 
 model = DenseModelARD(input_shape=train_X.shape[1], output_shape=1,
         activation=nn.functional.relu).to(device)
-opt = torch.optim.Adam(model.parameters(), lr=1e-2)
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, 'min')
 criterion = nn.MSELoss()
 
 n_epoches = 100000
 debug_frequency = 100
-reg_factor = 1e-3
+reg_factor = 1
 
 for epoch in range(n_epoches):
     opt.zero_grad()
@@ -40,7 +40,7 @@ for epoch in range(n_epoches):
     # scheduler.step(loss)
     opt.step()
     loss_train = float(criterion(preds, train_y).detach().cpu().numpy())
-    preds = model.predict(test_X, deterministic=True).squeeze()
+    preds = model(test_X).squeeze()
     loss_test = float(criterion(preds, test_y).detach().cpu().numpy())
     if epoch % debug_frequency == 0:
         print('%d epoch' % epoch)

@@ -21,7 +21,7 @@ ckpt_file = 'checkpoint/ckpt_ard.t7'
 
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
-reg_factor = 1e-4
+reg_factor = 1
 
 # Data
 print('==> Preparing data..')
@@ -60,7 +60,7 @@ if os.path.isfile(ckpt_file):
     start_epoch = checkpoint['epoch']
 
 criterion = nn.NLLLoss()
-optimizer = optim.SGD(model.parameters(), lr=1e-2, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
 
@@ -97,7 +97,7 @@ def test(epoch):
     with torch.no_grad():
         for batch_idx, (inputs, targets) in enumerate(testloader):
             inputs, targets = inputs.to(device), targets.to(device)
-            outputs = model.predict(inputs)
+            outputs = model(inputs)
             loss = criterion(outputs, targets)
 
             test_loss.append(loss.item())
