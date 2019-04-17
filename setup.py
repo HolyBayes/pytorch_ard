@@ -30,6 +30,6 @@ setup(
     ],
     dependency_links=[
         'git+https://github.com/rusty1s/pytorch_sparse.git@master#egg=TorchSparse-0',
-        'git+https://github.com/rusty1s/pytorch_scatter.git@master#egg=TorchScatter-0'
+        'TorchScatter @ https://github.com/rusty1s/pytorch_scatter.git@master'
     ]
 )
