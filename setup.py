@@ -29,7 +29,7 @@ setup(
         'PytorchSparse'
     ],
     dependency_links=[
-        'git+ssh://git@github.com:rusty1s/pytorch_sparse.git#egg=PytorchSparse-0.1',
-        'git+ssh://git@github.com:rusty1s/pytorch_scatter.git#egg=TorchScatter-0.1'
+        'git+ssh://git@github.com:rusty1s/pytorch_sparse.git@master#egg=PytorchSparse-0.1',
+        'git+ssh://git@github.com:rusty1s/pytorch_scatter.git@master#egg=TorchScatter-0.1'
     ]
 )
