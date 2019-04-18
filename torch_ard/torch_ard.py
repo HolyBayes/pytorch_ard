@@ -12,12 +12,14 @@ class LinearARD(nn.Module):
     Dense layer implementation with weights ARD-prior (arxiv:1701.05369)
     """
 
-    def __init__(self, in_features, out_features, bias=True, thresh=3):
+    def __init__(self, in_features, out_features, bias=True, thresh=3, sparse_thresh=0.8):
         super(LinearARD, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.Tensor(out_features, in_features))
         self.thresh = thresh
+        self.sparse_thresh = sparse_thresh
+        self.sparse_mult = False
         if bias:
             self.bias = Parameter(torch.Tensor(out_features))
         else:
@@ -30,8 +32,10 @@ class LinearARD(nn.Module):
         Forward with all regularized connections and random activations (Beyesian mode). Typically used for train
         """
         if self.training == False:
-#             return torch_sparse.spmm(self.weight_indices, self.weight_values, self.out_features, input.t()).t() + self.bias
-            return F.linear(input, self.weight_clipped, self.bias)
+            if self.sparse_mult:
+                return torch_sparse.spmm(self.weight_indices, self.weight_values, self.out_features, input.t()).t() + self.bias
+            else:
+                return F.linear(input, self.weight_clipped, self.bias)
 
         clip_mask = self.get_clip_mask()
         W = self.weight
@@ -65,6 +69,7 @@ class LinearARD(nn.Module):
         self.weight_indices = (clip_mask == 0).nonzero().t()
         self.weight_values = self.weight[1-clip_mask]
         self.weight_clipped = torch.where(clip_mask, torch.zeros_like(self.weight), self.weight)
+        self.sparse_mult = (self.get_dropped_params_cnt()*1.0/torch.ones_like(self.weight).sum()) > self.sparse_thresh
 
     def train(self, mode):
         if mode == False:
