@@ -30,7 +30,7 @@ class LinearARD(nn.Module):
         Forward with all regularized connections and random activations (Beyesian mode). Typically used for train
         """
         if self.training == False:
-#             out = torch_sparse.spmm(self.weight_indices, self.weight_values, self.out_features, input.t()).t()
+#             return torch_sparse.spmm(self.weight_indices, self.weight_values, self.out_features, input.t()).t() + self.bias
             return F.linear(input, self.weight_clipped, self.bias)
 
         clip_mask = self.get_clip_mask()
