@@ -24,7 +24,6 @@ setup(
         'torch>=1.1.0',
         'torchvision>=0.2.1',
         'scikit-learn>=0.19.2',
-        'pandas',
-        'pytorch_sparse @ git+https://github.com/rusty1s/pytorch_sparse.git@master'
+        'pandas'
     ]
 )
