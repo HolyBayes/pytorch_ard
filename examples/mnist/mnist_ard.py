@@ -58,6 +58,7 @@ n_classes = 10
 print('==> Building model..')
 model = LeNetARD_MNIST(1, n_classes).to(device)
 
+
 # if device.type == 'cuda':
 #     model = torch.nn.DataParallel(model)
 #     cudnn.benchmark = True
@@ -83,8 +84,7 @@ def train(epoch):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, targets) + \
-            trainloader.batch_size * reg_factor * get_ard_reg(model) / len(trainset)
+        loss = criterion(outputs, targets) + reg_factor * get_ard_reg(model)
         loss.backward()
         # scheduler.step(loss)
         optimizer.step()
@@ -141,5 +141,5 @@ def test(epoch):
 
 
 for epoch in range(start_epoch, start_epoch+100):
-    train(epoch)
     test(epoch)
+    train(epoch)

@@ -1,5 +1,6 @@
 torch>=1.0.0
 torchvision>=0.2.1
 scikit-learn>=0.19.2
+pandas
 torch_scatter
 git+https://github.com/rusty1s/pytorch_sparse
