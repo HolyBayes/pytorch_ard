@@ -110,8 +110,9 @@ class LinearARD(nn.Module):
 
 class Conv2dARD(nn.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, ard_init=-10, thresh=3):
-        bias = None # Learnable bias is not implemented yet
+                 padding=0, dilation=1, groups=1, ard_init=-10, thresh=3, bias=True):
+        if bias: bias = Parameter(torch.Tensor(out_channels))
+        else: bias = None
         super(Conv2dARD, self).__init__(in_channels, out_channels, kernel_size, stride,
                      padding, dilation, groups, bias)
         self.thresh = thresh
