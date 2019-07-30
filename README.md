@@ -72,7 +72,7 @@ You can see on the table above that variating regularization factor any degree o
 ## TODO
 - [X] LinearARD layer implementation
 - [X] Conv2dARD layer implementation
-- [ ] Learnable bias for Conv2dARD
+- [x] Learnable bias for Conv2dARD
 - [x] Implement *to_sparse(model)* utility
 
 ## Authors
