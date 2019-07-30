@@ -37,16 +37,8 @@ model(input)
 
 ## Installation
 
-### Using pip
-
 ```
-pip install pytorch-ard
-```
-
-### Alternative way
-
-```
-pip install git+https://github.com/HolyBayes/pytorch_ard
+pip install torch-scatter torch-sparse git+https://github.com/HolyBayes/pytorch_ard
 ```
 
 ## Experiments
