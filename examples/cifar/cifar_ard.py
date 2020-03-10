@@ -17,11 +17,12 @@ from torch_ard import get_ard_reg, get_dropped_params_ratio
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+ckpt_baseline_file = 'checkpoint/ckpt_baseline.t7'
 ckpt_file = 'checkpoint/ckpt_ard.t7'
 
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
-reg_factor = 1e-4
+reg_factor = 1e-5
 
 # Data
 print('==> Preparing data..')
@@ -49,17 +50,23 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 print('==> Building model..')
 model = LeNetARD(3, len(classes)).to(device)
 
-# if device.type == 'cuda':
-#     model = torch.nn.DataParallel(model)
-#     cudnn.benchmark = True
 
 if os.path.isfile(ckpt_file):
+    state_dict = model.state_dict()
     checkpoint = torch.load(ckpt_file)
-    model.load_state_dict(checkpoint['net'])
+    state_dict.update(checkpoint['net'])
+    model.load_state_dict(state_dict)
+    best_acc = checkpoint['acc']
+    start_epoch = checkpoint['epoch']
+elif os.path.isfile(ckpt_baseline_file):
+    state_dict = model.state_dict()
+    checkpoint = torch.load(ckpt_baseline_file)
+    state_dict.update(checkpoint['net'])
+    model.load_state_dict(state_dict,strict=False)
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
 
-criterion = nn.NLLLoss()
+criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
@@ -77,8 +84,10 @@ def train(epoch):
         outputs = model(inputs)
         loss = criterion(outputs, targets) + reg_factor * get_ard_reg(model)
         loss.backward()
+
         # scheduler.step(loss)
         optimizer.step()
+
 
         train_loss.append(loss.item())
         _, predicted = outputs.max(1)

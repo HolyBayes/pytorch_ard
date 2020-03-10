@@ -4,26 +4,25 @@ from torch.nn import Parameter
 import torch.nn.functional as F
 from functools import reduce
 import operator
-import torch_sparse
 
+eps = 1e-8
 
 class LinearARD(nn.Module):
     """
     Dense layer implementation with weights ARD-prior (arxiv:1701.05369)
     """
 
-    def __init__(self, in_features, out_features, bias=True, thresh=3, sparse_thresh=0.8):
+    def __init__(self, in_features, out_features, bias=True, thresh=3, ard_init=-10):
         super(LinearARD, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.weight = Parameter(torch.Tensor(out_features, in_features))
         self.thresh = thresh
-        self.sparse_thresh = sparse_thresh
-        self.sparse_mult = False
         if bias:
             self.bias = Parameter(torch.Tensor(out_features))
         else:
             self.register_parameter('bias', None)
+        self.ard_init = ard_init
         self.log_sigma2 = Parameter(torch.Tensor(out_features, in_features))
         self.reset_parameters()
 
@@ -31,26 +30,31 @@ class LinearARD(nn.Module):
         """
         Forward with all regularized connections and random activations (Beyesian mode). Typically used for train
         """
-        if self.training == False:
-            if self.sparse_mult:
-                return torch_sparse.spmm(self.weight_indices, self.weight_values, self.out_features, input.t()).t() + self.bias
-            else:
-                return F.linear(input, self.weight_clipped, self.bias)
+        if self.training == False: return F.linear(input, self.weights_clipped, self.bias)
 
         clip_mask = self.get_clip_mask()
         W = self.weight
         zeros = torch.zeros_like(W)
         mu = input.matmul(W.t())
+        eps = 1e-8
+        log_alpha = self.clip(self.log_alpha)
         si = torch.sqrt((input * input) \
-                        .matmul(((torch.exp(self.log_alpha) * self.weight * self.weight)+1e-8).t()))
+                        .matmul(((torch.exp(log_alpha) * self.weight * self.weight)+eps).t()))
         activation = mu + torch.normal(torch.zeros_like(mu), torch.ones_like(mu)) * si
         return activation + self.bias
+
+    @property
+    def weights_clipped(self):
+        clip_mask = self.get_clip_mask()
+        return torch.where(clip_mask, torch.zeros_like(self.weight), self.weight)
+
 
     def reset_parameters(self):
         self.weight.data.normal_(std=0.01)
         if self.bias is not None:
             self.bias.data.uniform_(0, 0)
-        self.log_sigma2.data.uniform_(-10,-10)
+        # self.log_sigma2.data = 2*torch.log(torch.abs(self.weight)+eps).clone().detach() + self.ard_init*torch.ones_like(self.log_sigma2)
+        self.log_sigma2.data = self.ard_init*torch.ones_like(self.log_sigma2)
 
     @staticmethod
     def clip(tensor, to=8):
@@ -64,16 +68,8 @@ class LinearARD(nn.Module):
         log_alpha = self.clip(self.log_alpha)
         return torch.ge(log_alpha, self.thresh)
 
-    def _update_sparse_weights(self):
-        clip_mask = self.get_clip_mask()
-        self.weight_indices = (clip_mask == 0).nonzero().t()
-        self.weight_values = self.weight[1-clip_mask]
-        self.weight_clipped = torch.where(clip_mask, torch.zeros_like(self.weight), self.weight)
-        self.sparse_mult = (self.get_dropped_params_cnt()*1.0/torch.ones_like(self.weight).sum()) > self.sparse_thresh
 
     def train(self, mode):
-        if mode == False:
-            self._update_sparse_weights()
         self.training = mode
         super(LinearARD, self).train(mode)
 
@@ -105,23 +101,20 @@ class LinearARD(nn.Module):
         eps = 1e-8
         return self.log_sigma2 - 2 * torch.log(torch.abs(self.weight)+eps)
 
-    # def to_sparse(self):
-
 
 class Conv2dARD(nn.Conv2d):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1,
-                 padding=0, dilation=1, groups=1, ard_init=-10, thresh=3, bias=True):
-        if bias: bias = Parameter(torch.Tensor(out_channels))
-        else: bias = None
+                 padding=0, dilation=1, groups=1, ard_init=-10, thresh=3):
+        bias = False # Goes to nan if bias = True
         super(Conv2dARD, self).__init__(in_channels, out_channels, kernel_size, stride,
                      padding, dilation, groups, bias)
+        self.bias = None
         self.thresh = thresh
-        self.bias = bias
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.ard_init = ard_init
         self.log_sigma2 = Parameter(ard_init*torch.ones_like(self.weight))
-
+        # self.log_sigma2 = Parameter(2 * torch.log(torch.abs(self.weight) + eps).clone().detach()+ard_init*torch.ones_like(self.weight))
 
     @staticmethod
     def clip(tensor, to=8):
@@ -138,31 +131,31 @@ class Conv2dARD(nn.Conv2d):
             return F.conv2d(input, self.weights_clipped,
                 self.bias, self.stride,
                 self.padding, self.dilation, self.groups)
-        
+        eps = 1e-8
         W = self.weight
         zeros = torch.zeros_like(W)
         clip_mask = self.get_clip_mask()
         conved_mu = F.conv2d(input, W, self.bias, self.stride,
             self.padding, self.dilation, self.groups)
-        conved_si = torch.sqrt(1e-8 + F.conv2d(input*input,
-            torch.exp(self.log_alpha) * W * W, self.bias, self.stride,
+        log_alpha = self.clip(self.log_alpha)
+        conved_si = torch.sqrt(eps + F.conv2d(input*input,
+            torch.exp(log_alpha) * W * W, self.bias, self.stride,
             self.padding, self.dilation, self.groups))
         conved = conved_mu + \
             conved_si * torch.normal(torch.zeros_like(conved_mu), torch.ones_like(conved_mu))
         return conved
+
+    @property
+    def weights_clipped(self):
+        clip_mask = self.get_clip_mask()
+        return torch.where(clip_mask, torch.zeros_like(self.weight), self.weight)
 
     
     def get_clip_mask(self):
         log_alpha = self.clip(self.log_alpha)
         return torch.ge(log_alpha, self.thresh)
 
-    def _update_sparse_weights(self):
-        clip_mask = self.get_clip_mask()
-        self.weights_clipped = torch.where(clip_mask, torch.zeros_like(self.weight), self.weight)
-
     def train(self, mode):
-        if mode == False:
-            self._update_sparse_weights()
         self.training = mode
         super(Conv2dARD, self).train(mode)
 

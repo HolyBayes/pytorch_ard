@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../../')
 import torch_ard as nn_ard
 from torch import nn
 import torch.nn.functional as F
@@ -12,7 +14,7 @@ class DenseModelARD(nn.Module):
         self._init_weights()
 
     def forward(self, input):
-        x = input
+        x = input.to(self.device)
         x = self.l1(x)
         x = nn.functional.tanh(x)
         x = self.l2(x)
@@ -22,6 +24,10 @@ class DenseModelARD(nn.Module):
     def _init_weights(self):
         for layer in self.children():
             if hasattr(layer, 'weight'): nn.init.xavier_uniform(layer.weight, gain=nn.init.calculate_gain('relu'))
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 
 class DenseModel(nn.Module):
@@ -33,7 +39,7 @@ class DenseModel(nn.Module):
         self._init_weights()
 
     def forward(self, input):
-        x = input
+        x = input.to(self.device)
         x = self.l1(x)
         x = nn.functional.tanh(x)
         x = self.l2(x)
@@ -43,6 +49,10 @@ class DenseModel(nn.Module):
     def _init_weights(self):
         for layer in self.children():
             if hasattr(layer, 'weight'): nn.init.xavier_uniform(layer.weight, gain=nn.init.calculate_gain('relu'))
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 class LeNet(nn.Module):
     def __init__(self, input_shape, output_shape):
@@ -54,17 +64,22 @@ class LeNet(nn.Module):
         self._init_weights()
 
     def forward(self, x):
-        out = F.relu(self.conv1(x))
+        out = F.relu(self.conv1(x.to(self.device)))
         out = F.max_pool2d(out, 2)
         out = F.relu(self.conv2(out))
         out = F.max_pool2d(out, 2)
         out = out.view(out.shape[0], -1)
         out = F.relu(self.l1(out))
-        return F.log_softmax(self.l2(out), dim=1)
+        return self.l2(out)
+        # return F.log_softmax(self.l2(out), dim=1)
 
     def _init_weights(self):
         for layer in self.children():
             if hasattr(layer, 'weight'): nn.init.xavier_uniform(layer.weight, gain=nn.init.calculate_gain('relu'))
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 class LeNetARD(nn.Module):
     def __init__(self, input_shape, output_shape):
@@ -76,17 +91,22 @@ class LeNetARD(nn.Module):
         self._init_weights()
 
     def forward(self, input):
-        out = F.relu(self.conv1(input))
+        out = F.relu(self.conv1(input.to(self.device)))
         out = F.max_pool2d(out, 2)
         out = F.relu(self.conv2(out))
         out = F.max_pool2d(out, 2)
         out = out.view(out.shape[0], -1)
         out = F.relu(self.l1(out))
-        return F.log_softmax(self.l2(out), dim=1)
+        return self.l2(out)
+        # return F.log_softmax(self.l2(out), dim=1)
 
     def _init_weights(self):
         for layer in self.children():
             if hasattr(layer, 'weight'): nn.init.xavier_uniform(layer.weight, gain=nn.init.calculate_gain('relu'))
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 
 class LeNet_MNIST(LeNet):

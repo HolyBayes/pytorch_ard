@@ -47,17 +47,13 @@ classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship'
 print('==> Building model..')
 model = LeNet(3, len(classes)).to(device)
 
-if device.type == 'cuda':
-    model = torch.nn.DataParallel(model)
-    cudnn.benchmark = True
-
 if os.path.isfile(ckpt_file):
     checkpoint = torch.load(ckpt_file)
     model.load_state_dict(checkpoint['net'])
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
 
-criterion = nn.NLLLoss()
+criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
