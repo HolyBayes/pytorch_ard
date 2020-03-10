@@ -38,7 +38,7 @@ model(input)
 ## Installation
 
 ```
-pip install torch-scatter torch-sparse git+https://github.com/HolyBayes/pytorch_ard
+pip install git+https://github.com/HolyBayes/pytorch_ard
 ```
 
 ## Experiments
