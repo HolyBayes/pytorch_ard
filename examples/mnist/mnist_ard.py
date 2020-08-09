@@ -8,12 +8,13 @@ from torchvision import datasets
 import torchvision.transforms as transforms
 import numpy as np
 
-import os, sys
+import os
+import sys
 sys.path.append('../')
 import time
 
 from models import LeNetARD_MNIST
-from torch_ard import get_ard_reg, get_dropped_params_ratio
+from torch_ard import get_ard_reg, get_dropped_params_ratio, ELBOLoss
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,16 +42,17 @@ transform_test = transforms.Compose([
 ])
 
 trainset = datasets.MNIST('./data', train=True, download=True,
-               transform=transforms.Compose([
-                   transforms.ToTensor(),
-                   transforms.Normalize((0.1307,), (0.3081,))
-               ]))
-trainloader = torch.utils.data.DataLoader(trainset,batch_size=128, shuffle=True)
+                          transform=transforms.Compose([
+                              transforms.ToTensor(),
+                              transforms.Normalize((0.1307,), (0.3081,))
+                          ]))
+trainloader = torch.utils.data.DataLoader(
+    trainset, batch_size=128, shuffle=True)
 
 testset = datasets.MNIST('./data', train=False, transform=transforms.Compose([
-                   transforms.ToTensor(),
-                   transforms.Normalize((0.1307,), (0.3081,))
-               ]))
+    transforms.ToTensor(),
+    transforms.Normalize((0.1307,), (0.3081,))
+]))
 testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=True)
 
 n_classes = 10
@@ -71,18 +73,25 @@ elif os.path.isfile(ckpt_baseline_file):
     state_dict = model.state_dict()
     checkpoint = torch.load(ckpt_baseline_file)
     state_dict.update(checkpoint['net'])
-    model.load_state_dict(state_dict,strict=False)
+    model.load_state_dict(state_dict, strict=False)
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
 
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
+criterion = ELBOLoss(model, F.cross_entropy).to(device)
+optimizer = optim.SGD(model.parameters(), lr=1e-3,
+                      momentum=0.9)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+n_epoches = 100
+
+def get_kl_weight(epoch): return min(1, 1e-2 * epoch / n_epoches)
 
 # Training
+
+
 def train(epoch):
     print('\nEpoch: %d' % epoch)
+    kl_weight = get_kl_weight(epoch)
     model.train()
     train_loss = []
     correct = 0
@@ -91,7 +100,7 @@ def train(epoch):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, targets) + reg_factor * get_ard_reg(model)
+        loss = criterion(outputs, targets, 1, kl_weight)
         loss.backward()
         # scheduler.step(loss)
         optimizer.step()
@@ -101,7 +110,8 @@ def train(epoch):
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
     print('Train loss: %.3f' % np.mean(train_loss))
-    print('Train accuracy: %.3f%%' % (correct * 100.0/total))
+    print('Train accuracy: %.3f%%' % (correct * 100.0 / total))
+
 
 def test(epoch):
     global best_acc
@@ -125,8 +135,8 @@ def test(epoch):
             correct += predicted.eq(targets).sum().item()
 
     # Save checkpoint.
-    acc = 100.*correct/total
-    compression = 100.*get_dropped_params_ratio(model)
+    acc = 100. * correct / total
+    compression = 100. * get_dropped_params_ratio(model)
     print('Test loss: %.3f' % np.mean(test_loss))
     print('Test accuracy: %.3f%%' % acc)
     print('Compression: %.2f%%' % compression)
@@ -147,6 +157,6 @@ def test(epoch):
         best_compression = compression
 
 
-for epoch in range(start_epoch, start_epoch+100):
+for epoch in range(start_epoch, start_epoch + n_epoches):
     test(epoch)
     train(epoch)

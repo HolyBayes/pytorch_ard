@@ -8,11 +8,12 @@ import torchvision
 import torchvision.transforms as transforms
 import numpy as np
 
-import os, sys
+import os
+import sys
 sys.path.append('../')
 
 from models import LeNetARD
-from torch_ard import get_ard_reg, get_dropped_params_ratio
+from torch_ard import get_ard_reg, get_dropped_params_ratio, ELBOLoss
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,13 +39,18 @@ transform_test = transforms.Compose([
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
 
-trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, shuffle=True, num_workers=2)
+trainset = torchvision.datasets.CIFAR10(
+    root='./data', train=True, download=True, transform=transform_train)
+trainloader = torch.utils.data.DataLoader(
+    trainset, batch_size=128, shuffle=True, num_workers=2)
 
-testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
+testset = torchvision.datasets.CIFAR10(
+    root='./data', train=False, download=True, transform=transform_test)
+testloader = torch.utils.data.DataLoader(
+    testset, batch_size=100, shuffle=False, num_workers=2)
 
-classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
+classes = ('plane', 'car', 'bird', 'cat', 'deer',
+           'dog', 'frog', 'horse', 'ship', 'truck')
 
 # Model
 print('==> Building model..')
@@ -62,18 +68,22 @@ elif os.path.isfile(ckpt_baseline_file):
     state_dict = model.state_dict()
     checkpoint = torch.load(ckpt_baseline_file)
     state_dict.update(checkpoint['net'])
-    model.load_state_dict(state_dict,strict=False)
+    model.load_state_dict(state_dict, strict=False)
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
 
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
+criterion = ELBOLoss(model, F.cross_entropy).to(device)
+optimizer = optim.SGD(model.parameters(), lr=1e-3,
+                      momentum=0.9)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
+n_epoches = 200
+def get_kl_weight(epoch): return min(1, 1e-4 * epoch / n_epoches)
 
 
 # Training
 def train(epoch):
     print('\nEpoch: %d' % epoch)
+    kl_weight = get_kl_weight(epoch)
     model.train()
     train_loss = []
     correct = 0
@@ -82,19 +92,19 @@ def train(epoch):
         inputs, targets = inputs.to(device), targets.to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
-        loss = criterion(outputs, targets) + reg_factor * get_ard_reg(model)
+        loss = criterion(outputs, targets, 1, kl_weight)
         loss.backward()
 
         # scheduler.step(loss)
         optimizer.step()
-
 
         train_loss.append(loss.item())
         _, predicted = outputs.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
     print('Train loss: %.2f' % np.mean(train_loss))
-    print('Train accuracy: %.2f%%' % (correct * 100.0/total))
+    print('Train accuracy: %.2f%%' % (correct * 100.0 / total))
+
 
 def test(epoch):
     global best_acc
@@ -106,7 +116,7 @@ def test(epoch):
         for batch_idx, (inputs, targets) in enumerate(testloader):
             inputs, targets = inputs.to(device), targets.to(device)
             outputs = model(inputs)
-            loss = criterion(outputs, targets)
+            loss = criterion(outputs, targets, 1, 0)
 
             test_loss.append(loss.item())
             _, predicted = outputs.max(1)
@@ -114,10 +124,10 @@ def test(epoch):
             correct += predicted.eq(targets).sum().item()
 
     # Save checkpoint.
-    acc = 100.*correct/total
+    acc = 100. * correct / total
     print('Test loss: %.2f' % np.mean(test_loss))
     print('Test accuracy: %.2f%%' % acc)
-    print('Compression: %.2f%%' % (100.*get_dropped_params_ratio(model)))
+    print('Compression: %.2f%%' % (100. * get_dropped_params_ratio(model)))
     if acc > best_acc:
         print('Saving..')
         state = {
@@ -131,6 +141,6 @@ def test(epoch):
         best_acc = acc
 
 
-for epoch in range(start_epoch, start_epoch+200):
+for epoch in range(start_epoch, start_epoch + n_epoches):
     train(epoch)
     test(epoch)

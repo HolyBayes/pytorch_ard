@@ -26,8 +26,8 @@ model = nn.Sequential(
     nn_ard.LinearARD(hidden_size, output_size)
 )
 
-reg_factor = 1.0
-criterion = lambda input, target: F.binary_cross_entropy(input, target) + reg_factor*nn_ard.get_ard_reg(model)
+
+criterion = nn_ard.ELBOLoss(model, F.cross_entropy)
 print('Sparsification ratio: %.3f%%' % (100.*nn_ard.get_dropped_params_ratio(model)))
 
 # test stage
@@ -68,12 +68,6 @@ You can see on the table above that variating regularization factor any degree o
 * **SkLearn** >= 0.19.1
 * **Pandas** >= 0.23.3
 * **Numpy** >= 1.14.5
-
-## TODO
-- [X] LinearARD layer implementation
-- [X] Conv2dARD layer implementation
-- [x] Learnable bias for Conv2dARD
-- [x] Implement *to_sparse(model)* utility
 
 ## Authors
 

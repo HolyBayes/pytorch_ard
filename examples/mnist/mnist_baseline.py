@@ -8,7 +8,8 @@ from torchvision import datasets
 import torchvision.transforms as transforms
 import numpy as np
 
-import os, sys
+import os
+import sys
 sys.path.append('../')
 import time
 
@@ -37,17 +38,19 @@ transform_test = transforms.Compose([
 ])
 
 trainset = datasets.MNIST('./data', train=True, download=True,
-               transform=transforms.Compose([
-                   transforms.ToTensor(),
-                   transforms.Normalize((0.1307,), (0.3081,))
-               ]))
-trainloader = torch.utils.data.DataLoader(trainset,batch_size=128, shuffle=True)
+                          transform=transforms.Compose([
+                              transforms.ToTensor(),
+                              transforms.Normalize((0.1307,), (0.3081,))
+                          ]))
+trainloader = torch.utils.data.DataLoader(
+    trainset, batch_size=128, shuffle=True)
 
 testset = datasets.MNIST('./data', train=False, transform=transforms.Compose([
-                   transforms.ToTensor(),
-                   transforms.Normalize((0.1307,), (0.3081,))
-               ]))
-testloader = torch.utils.data.DataLoader(testset, batch_size=1000, shuffle=True)
+    transforms.ToTensor(),
+    transforms.Normalize((0.1307,), (0.3081,))
+]))
+testloader = torch.utils.data.DataLoader(
+    testset, batch_size=1000, shuffle=True)
 
 
 n_classes = 10
@@ -67,10 +70,12 @@ if os.path.isfile(ckpt_file):
     start_epoch = checkpoint['epoch']
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9, weight_decay=5e-4)
+optimizer = optim.SGD(model.parameters(), lr=1e-3, momentum=0.9)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min')
 
 # Training
+
+
 def train(epoch):
     print('\nEpoch: %d' % epoch)
     model.train()
@@ -91,7 +96,8 @@ def train(epoch):
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
     print('Train loss: %.3f' % np.mean(train_loss))
-    print('Train accuracy: %.3f%%' % (correct * 100.0/total))
+    print('Train accuracy: %.3f%%' % (correct * 100.0 / total))
+
 
 def test(epoch):
     global best_acc
@@ -114,7 +120,7 @@ def test(epoch):
             correct += predicted.eq(targets).sum().item()
 
     # Save checkpoint.
-    acc = 100.*correct/total
+    acc = 100. * correct / total
     print('Test loss: %.3f' % np.mean(test_loss))
     print('Test accuracy: %.3f%%' % acc)
     print('Inference time: %.2f seconds' % inference_time_seconds)
@@ -131,6 +137,6 @@ def test(epoch):
         best_acc = acc
 
 
-for epoch in range(start_epoch, start_epoch+100):
+for epoch in range(start_epoch, start_epoch + 100):
     train(epoch)
     test(epoch)

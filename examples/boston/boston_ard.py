@@ -5,9 +5,11 @@ from sklearn.datasets import load_boston
 from sklearn.model_selection import train_test_split
 import pandas as pd
 from torch import nn
+import torch.nn.functional as F
 import torch
 import numpy as np
-from torch_ard import get_ard_reg, get_dropped_params_ratio
+from torch_ard import get_ard_reg, get_dropped_params_ratio, ELBOLoss
+from tqdm import trange, tqdm
 
 boston = load_boston()
 df = pd.DataFrame(boston.data, columns=boston.feature_names)
@@ -19,32 +21,33 @@ train_X, test_X, train_y, test_y = train_test_split(X, y, train_size=0.8)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device('cpu')
 train_X, test_X, train_y, test_y = \
-    [torch.from_numpy(np.array(x)).float().to(device) for x in [train_X, test_X, train_y, test_y]]
+    [torch.from_numpy(np.array(x)).float().to(device)
+     for x in [train_X, test_X, train_y, test_y]]
 
 model = DenseModelARD(input_shape=train_X.shape[1], output_shape=1,
-        activation=nn.functional.relu).to(device)
+                      activation=nn.functional.relu).to(device)
 opt = torch.optim.Adam(model.parameters(), lr=1e-3)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, 'min')
-criterion = nn.MSELoss()
+criterion = ELBOLoss(model, F.mse_loss).to(device)
 
 n_epoches = 100000
 debug_frequency = 100
-reg_factor = 1
+def get_kl_weight(epoch): return min(1, 2 * epoch / n_epoches)
 
-for epoch in range(n_epoches):
+
+pbar = trange(n_epoches, leave=True, position=0)
+for epoch in pbar:
+    kl_weight = get_kl_weight(epoch)
     opt.zero_grad()
     preds = model(train_X).squeeze()
-    reg = get_ard_reg(model)
-    loss = criterion(preds, train_y) + reg*reg_factor
+    loss = criterion(preds, train_y, 1, kl_weight)
     loss.backward()
-    # scheduler.step(loss)
     opt.step()
-    loss_train = float(criterion(preds, train_y).detach().cpu().numpy())
+    loss_train = float(
+        criterion(preds, train_y, 1, 0).detach().cpu().numpy())
     preds = model(test_X).squeeze()
-    loss_test = float(criterion(preds, test_y).detach().cpu().numpy())
-    if epoch % debug_frequency == 0:
-        print('%d epoch' % epoch)
-        print('MSE (train): %.3f' % loss_train)
-        print('MSE (test): %.3f' % loss_test)
-        print('Reg: %.3f' % reg.item())
-        print('Dropout rate: %f%%' % (100*get_dropped_params_ratio(model)))
+    loss_test = float(
+        criterion(preds, test_y, 1, 0).detach().cpu().numpy())
+    pbar.set_description('MSE (train): %.3f\tMSE (test): %.3f\tReg: %.3f\tDropout rate: %f%%' % (
+        loss_train, loss_test, get_ard_reg(model).item(), 100 * get_dropped_params_ratio(model)))
+    pbar.update()
