@@ -28,8 +28,8 @@ class LinearARD(nn.Module):
     def forward(self, input):
         if self.training:
             W_mu = F.linear(input, self.weight)
-            std_w = torch.exp(self.log_sigma2).permute(1,0)
-            W_std = torch.sqrt((input.pow(2)).matmul(std_w.pow(2)))
+            std_w = torch.exp(self.log_alpha).permute(1,0)
+            W_std = torch.sqrt((input.pow(2)).matmul(std_w*(self.weight.permute(1,0)**2)) + 1e-15)
 
             epsilon = W_std.new(W_std.shape).normal_()
             output = W_mu + W_std * epsilon
