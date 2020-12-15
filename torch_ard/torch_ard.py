@@ -27,11 +27,17 @@ class LinearARD(nn.Module):
 
     def forward(self, input):
         if self.training:
-            epsilon = self.weight.new(self.weight.shape).normal_()
-            W = self.weight + epsilon * torch.exp(self.log_sigma2 / 2)
+            W_mu = F.linear(input, self.weight)
+            std_w = torch.exp(self.log_sigma2).permute(1,0)
+            W_std = torch.sqrt((input.pow(2)).matmul(std_w.pow(2)))
+
+            epsilon = W_std.new(W_std.shape).normal_()
+            output = W_mu + W_std * epsilon
+            output += self.bias
         else:
             W = self.weights_clipped
-        return F.linear(input, W) + self.bias
+            output = F.linear(input, W) + self.bias
+        return output
 
     @property
     def weights_clipped(self):
@@ -101,8 +107,7 @@ class Conv2dARD(nn.Conv2d):
                             self.bias, self.stride,
                             self.padding, self.dilation, self.groups)
         W = self.weight
-        zeros = torch.zeros_like(W)
-        clip_mask = self.get_clip_mask()
+
         conved_mu = F.conv2d(input, W, self.bias, self.stride,
                              self.padding, self.dilation, self.groups)
         log_alpha = self.log_alpha
