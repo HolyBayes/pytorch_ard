@@ -33,7 +33,7 @@ class LinearARD(nn.Module):
 
             epsilon = W_std.new(W_std.shape).normal_()
             output = W_mu + W_std * epsilon
-            output += self.bias
+            if self.bias: output += self.bias
         else:
             W = self.weights_clipped
             output = F.linear(input, W) + self.bias
